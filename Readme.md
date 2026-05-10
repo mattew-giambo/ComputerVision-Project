@@ -1,0 +1,1 @@
+# Project 2: Joint Detection of AI-Generated Images and Post-Processing Alterations in Real-World Scenarios
