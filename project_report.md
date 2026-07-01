@@ -1,8 +1,6 @@
 # Project Report — Computer Vision (A.Y. 2025/2026)
 
-## Joint Detection of AI-Generated Images and Post-Processing Alterations in Real-World Scenarios
-**Project 2 | Multi-Task RGB-D Learning with Frequency-Domain Analysis**
-
+## Project 2 | Joint Detection of AI-Generated Images and Post-Processing Alterations in Real-World Scenarios
 ---
 
 ### Course Information
@@ -10,7 +8,7 @@
 * **Course:** Computer Vision (M.Sc. in Engineering in Computer Science)
 * **Academic Year:** 2025/2026
 * **Professor:** Prof. Irene Amerini
-* **Candidate(s):** [Candidate Name(s) and Student ID(s) - Placeholder]
+* **Candidate(s):** []
 
 ---
 
@@ -58,20 +56,22 @@
 To understand this project, we must start with the absolute basics of how computers "see" images and how AI changes this field.
 
 ### What is the Problem?
-AI models can now generate photorealistic synthetic images. These images look completely real to the human eye, which makes it easy to spread fake visual information. Computer vision researchers try to build automated detector programs to distinguish real camera photographs from AI-generated fakes.
+Nowadays, generative models can produce photorealistic images. These images look completely real to the human eye, which makes it easy to spread fake visual information. Computer vision researchers try to build automated detectors to distinguish real camera photographs from AI-generated fakes.
 
-In the real world, this task is extremely difficult because images do not remain in their original, clean state. When you view an image online, it has almost always undergone some form of **post-processing**. For example:
+In the real world, this task is extremely difficult because images do not remain in their original, clean state but, it has almost always undergone some form of **post-processing**. For example:
 * **Internet Transfer:** Uploading a photo to social media platforms (like Instagram or WhatsApp) automatically resizes the image and applies lossy **JPEG compression** to save storage space.
 * **Re-digitalisation:** A user might print the digital image onto physical paper and then re-photograph it with a smartphone or scan it back into a computer.
 
-These operations alter the pixel values, washing away the microscopic traces (like camera sensor noise) that detectors use to identify fakes.
+These operations alter the pixel values, removing the microscopic traces (like camera sensor noise) that detectors use to identify fakes.
 
 ### Our Solution
-This project builds a unified neural network, called **MultiTaskNet**, to answer two forensic questions simultaneously from a single input image:
-1. **Task 1 — AI Detection:** Is the image a genuine photograph or AI-generated? (Binary classification: `real` vs. `ai`).
-2. **Task 2 — Post-Processing Classification:** What transformation has the image undergone? (Three-class classification: `original` for no changes, `redigital` for printed-and-scanned, and `transfer` for compressed social media images).
+This project builds a unified neural network, called **MultiTaskNet**, to answer two questions simultaneously from a single input image:
+1. **Task 1 — AI Detection:** Is the image a camera captured or AI-generated?  
+(Binary classification: `real` vs. `ai`).
+2. **Task 2 — Post-Processing Classification:** What transformation has the image undergone?   
+(Three-class classification: `original` for no changes, `redigital` for printed-and-scanned, and `transfer` for compressed social media images).
 
-Instead of treating these tasks separately, we use **Multi-Task Learning (MTL)**. By training one network on both tasks, the model learns a shared representation. Recognizing the type of post-processing helps the network understand how the image was altered, which in turn helps it isolate and remove post-processing noise to make the AI detector highly robust.
+Instead of treating these tasks separately, we use **Multi-Task Learning (MTL)**. By training one network on both tasks, the model learns a shared representation.
 
 ---
 
@@ -82,114 +82,35 @@ Before building our model, we must look at how researchers currently attempt to 
 ### 2.1 Spatial vs. Frequency Detection
 Early detectors trained Convolutional Neural Networks (CNNs) in the **spatial domain** (using the raw color pixels directly). To make them robust to transformations, researchers applied data augmentations (like random blurring or JPEG compression) during training. This forces the model to ignore fragile pixel details and focus on global object structures.
 
-However, generative models leave behind unique **spectral fingerprints**. The upsampling layers used by generative models to enlarge small noise grids into full-size images introduce repeating, grid-like artifacts. By converting the image to the **frequency domain** (using the Fourier Transform), we can isolate these repeating grid lines, which appear as bright, symmetrical dots in the spectrum.
+However, generative models leave behind unique **spectral fingerprints**, which can be observed by converting the image to the **frequency domain** (using the Fourier Transform), resulting in bright, symmetrical patterns in the spectrum.
 
 ### 2.2 Adding 3D Geometry (Depth)
 Recently, diffusion models have challenged existing frequency detectors because they do not use standard convolutional upsampling and thus do not leave periodic spectral grids. 
 
-To catch these newer fakes, researchers have turned to **3D geometry**. Real cameras capture actual three-dimensional scenes. AI generators, on the other hand, generate 2D pixels that look realistic but often contain 3D geometrical errors (like shadows pointing in inconsistent directions or perspective lines that do not align correctly). By extracting a **depth map** (which shows how far objects are from the camera) and feeding it as a separate channel alongside the RGB colors, we can expose these geometric inconsistencies. Crucially, these 3D shapes do not disappear when the image is compressed or printed.
+Therefore researchers have turned to **3D geometry**. Real cameras capture actual three-dimensional scenes. AI generators, on the other hand, generate 2D pixels that look realistic but often contain 3D geometrical errors (like shadows pointing in inconsistent directions or perspective lines that do not align correctly). By extracting a **depth map** (which shows how far objects are from the camera), we can expose these geometric inconsistencies.
 
 ---
 
 ## 3. Theoretical Background: Explaining the Concepts from Scratch
 
-This section explains the foundational concepts from the Computer Vision course that form the building blocks of our project.
 
-### 3.1 What is a Digital Image?
-To a computer, a grayscale digital image is a 2D grid of numbers called **pixels**. A typical grid size might be 224 rows by 224 columns. Each pixel contains a number from `0` (pure black) to `255` (pure white). 
-A color image is a 3D grid with three color layers (called **channels**): Red, Green, and Blue (RGB). Therefore, a color image of size 224x224 pixels is represented as a tensor of shape `[3, 224, 224]`.
-
----
-
-### 3.2 The Fourier Transform and the Frequency Domain
-The Fourier Transform is a mathematical tool that allows us to view an image in two different ways:
-1. **Spatial Domain:** The standard view, which shows *where* colors and objects are located in space (pixels on a grid).
-2. **Frequency Domain:** A new view, which shows *how quickly* colors change as you move across the image.
-
-#### Fast and Slow Changes (Frequencies)
-* **High Frequencies:** Areas where color changes very quickly over a small space, such as sharp edges, textures, noise, or fine details.
-* **Low Frequencies:** Areas where color changes very slowly, such as a smooth blue sky or flat walls.
-
-The **2D Discrete Fourier Transform (DFT)** convert pixels into a complex-valued spectrum:
-
-$$F(u, v) = \sum_{x=0}^{M-1} \sum_{y=0}^{N-1} f(x, y) \cdot e^{-j 2\pi \left(\frac{ux}{M} + \frac{vy}{N}\right)}$$
-
-The **Fast Fourier Transform (FFT)** is the efficient algorithm used to calculate this grid. The output grid contains complex numbers ($a + jb$), which we separate into two parts:
-1. **Magnitude Spectrum:** Measures the *strength* of each frequency.
-2. **Phase Spectrum:** Measures the *starting position* (alignment) of each frequency.
-
-#### The Zebra and Cheetah Swap Experiment
-In class, we discussed a classic experiment that illustrates the difference between magnitude and phase:
-* Take the Fourier Transform of a cheetah image and a zebra image.
-* Combine the **phase** of the cheetah with the **magnitude** of the zebra, and reconstruct the image. The result clearly shows a cheetah, but with zebra-like textures.
-* Combine the **phase** of the zebra with the **magnitude** of the cheetah. The reconstructed image shows a zebra, overlaid with cheetah-like noise.
-
-This proves that **the phase spectrum carries the structural details (edges and shapes) of the image, while the magnitude spectrum carries the frequency energy (noise and repeating patterns)**. In our model, we use both magnitude and phase as inputs to our frequency branch.
-
-#### Convolution Theorem
-The **Convolution Theorem** states that applying a filter to an image in the spatial domain (e.g., blurring it) is equivalent to multiplying the image's spectrum by the filter's spectrum in the frequency domain:
-
-$$\mathcal{F}[g * h] = \mathcal{F}[g] \cdot \mathcal{F}[h]$$
-
-This explains why post-processing operations (like blurring or JPEG compression, which are low-pass filters) directly alter or erase high-frequency details in the spectrum.
-
----
-
-### 3.3 Convolutional Neural Networks (CNNs) for Image Recognition
-A Convolutional Neural Network (CNN) is a deep learning model designed to extract visual features from images. A standard CNN is built from the following layers:
-
-1. **Convolutional Layer:** This layer slides a set of small filters (e.g., a 3x3 pixel window) across the input image. At each step, it multiplies the filter weights by the pixel values to detect specific patterns. Early layers detect simple patterns like vertical or horizontal lines (edges). Deeper layers combine these lines to detect complex shapes (like circles) and objects (like eyes or wheels).
-2. **Batch Normalisation (BN):** Normalises the numerical features across a batch of images. This prevents the numbers from becoming too large or too small, making training faster and more stable.
-3. **Activation Function (ReLU / GELU):** Introduces non-linearity. Without activation functions, stacking multiple layers would be equivalent to a single linear equation, meaning the network could not learn complex patterns. GELU (Gaussian Error Linear Unit) is a smooth version of ReLU.
-4. **Max Pooling:** Slides a window (usually 2x2) across the feature map and keeps only the maximum value. This halves the spatial size (reducing resolution), which makes the features robust to small shifts or translations in the image.
-5. **Global Average Pooling:** Converts a 2D feature map of any size into a single number by taking the average of all its values. This reduces the spatial dimensions to 1x1, producing a flat vector that is fed into the classification layers.
-
----
-
-### 3.4 Monocular Depth Estimation (MDE) and RGB-D Representations
-Monocular Depth Estimation (MDE) is the task of predicting the 3D depth of a scene using a single 2D image. An RGB-D representation combines the three standard color channels (Red, Green, Blue) with a fourth channel: a dense **depth map (D)** showing the distance of each pixel from the camera.
-
-In class, we studied **Depth Anything V2**, which uses a **Teacher-Student training framework**:
-* **The Teacher Model:** A large, heavy transformer model is trained on high-quality synthetic 3D data. While precise, it struggles to generalise to real-world images due to the "distribution shift" (synthetic data looks different from real photographs).
-* **Pseudo-Labelling:** To bridge this gap, the Teacher model is run on a massive dataset of unlabeled real-world images, predicting depth maps (called "pseudo-labels") for them.
-* **The Student Model:** A smaller, lightweight model is trained on these real-world images using the pseudo-labels generated by the Teacher. This allows the Student to learn robust, real-world depth estimation.
-
-In forensic security, MDE is highly valuable: AI generators are designed to make realistic 2D pixels, but they struggle with 3D physical consistency. This leaves geometric inconsistencies in the depth map (such as flat areas where there should be volume, or incorrect perspective lines) that can be detected by the model.
-
----
-
-### 3.5 Deep Generative Models and Diffusion Models (DDPM)
-Generative models learn the underlying probability distribution of real data ($p(x)$) to generate new, unique samples that look real.
-
-In class, we studied **Denoising Diffusion Probabilistic Models (DDPM)**. They operate using two processes:
-1. **Forward Process (Noising):** Takes a real image $x_0$ and gradually adds small amounts of Gaussian noise over $T$ steps (usually $T=1000$) until the image becomes pure, unstructured noise $x_T$. This process is fixed and does not require learning.
-2. **Backward Process (Denoising / Generation):** A neural network learns to reverse the noise addition. Starting from random noise $x_T$, the model predicts and removes a small amount of noise at each step, gradually recovering a clean, structured image $x_0$.
-
-Because diffusion models generate images via incremental denoising rather than convolutional upsampling, they do not produce the same periodic upsampling grids as older GAN models. This makes them harder to detect and requires the use of multi-modal features.
-
----
-
-### 3.6 Multi-Task Learning as Regularisation
-In machine learning, **overfitting** occurs when a model memorises the training data too well, including its noise and quirks, making it perform poorly on new, unseen test images. **Regularisation** is any technique used to prevent overfitting.
-
-**Multi-Task Learning (MTL)** acts as an implicit regulariser. By forcing a single shared backbone network to extract features that are useful for both AI detection and post-processing classification, we prevent the model from focusing on fragile, task-specific details. Instead, the network must learn general visual, geometric, and frequency patterns that are robust to alterations.
 
 ---
 
 ## 4. Dataset (RRDataset & Pre-computed Depth)
 
 ### The RRDataset
-We use the **RRDataset** (*Real/Redigital* dataset) to train and test our models. The images in this dataset are organized along two axes:
+We use the **RRDataset** (*Real/Redigital* dataset) to train and test our model. The images in this dataset are organized into five categories:
 
 1. **AI Label (Task 1):**
    * `real`: Genuine photos taken by cameras.
-   * `ai`: Images generated by AI models (like GANs and diffusion models).
+   * `ai`: Images generated by AI models.
 2. **Domain Label (Task 2):**
    * `original`: Digital native images with no alterations.
    * `redigital`: Images printed on paper and re-digitised using a scanner or camera.
-   * `transfer`: Digital images subjected to social media compression and resizing.
+   * `transfer`: Digital images subjected to internet compression and resizing.
 
-Combining these two axes yields **six distinct subgroups**:
+Combining these categories yields **six distinct subgroups**:
 * Original Real & Original AI
 * Redigital Real & Redigital AI
 * Transfer Real & Transfer AI
@@ -197,26 +118,26 @@ Combining these two axes yields **six distinct subgroups**:
 ```
 RRDataset_test/
 ├── original/
-│   ├── ai/       ← AI-generated, clean
-│   └── real/     ← Genuine photo, clean
+│   ├── ai/
+│   └── real/
 ├── redigital/
-│   ├── ai/       ← AI-generated, printed-and-scanned
-│   └── real/     ← Genuine photo, printed-and-scanned
+│   ├── ai/
+│   └── real/
 └── transfer/
-    ├── ai/       ← AI-generated, social-media compressed
-    └── real/     ← Genuine photo, social-media compressed
+    ├── ai/
+    └── real/
 ```
 
 ### Dataset Balancing and Splits
-To ensure the model does not develop a bias towards any class (e.g., predicting "real" just because there are more real images in the dataset), we cap the total dataset size at **15,000 samples** and balance it using a uniform quota strategy. This guarantees that each of the six subgroups contains exactly 2,500 images.
+To ensure the model does not develop a bias towards any class (e.g., predicting "real" just because there are more real images in the dataset), we cap the total dataset size at **15,000 samples**, ensuring an equal distribution across all classes.
 
-We split this balanced dataset using a fixed random seed (seed = 42) into:
-* **Training Split (70%):** ~10,500 images, used to train the network.
-* **Validation Split (15%):** ~2,250 images, used to tune hyperparameters and apply early stopping.
-* **Test Split (15%):** ~2,250 images, held out and used only for final, unbiased evaluation.
+We split this balanced dataset using a fixed random seed into:
+* **Training Split (70%):**, used to train the network.
+* **Validation Split (15%):**, used to tune hyperparameters and apply early stopping.
+* **Test Split (15%):**, used only for final, unbiased evaluation.
 
-### Depth Map Cache
-To save GPU memory and training time, we pre-computed all depth maps **offline** (once before training) using **Depth Anything V2 (Small)**. These are saved to disk in a separate directory (`RRDataset_depth/`) as `.pt` files. During training, the dataloader loads the RGB image and its corresponding pre-computed `.pt` depth tensor at zero computational cost.
+### Depth Maps
+To save GPU memory and training time, we pre-computed all depth maps once before traini/ng using **Depth Anything V2 (Small)**. These are saved to disk in a separate directory (`RRDataset_depth/`) as `.pt` files. During training, the dataloader loads the RGB image and its corresponding pre-computed `.pt` depth tensor at zero computational cost.
 
 ---
 
