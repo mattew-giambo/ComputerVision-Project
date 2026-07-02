@@ -9,7 +9,7 @@
 
 ---
 
-This project implements a **unified multi-task deep learning framework** that simultaneously addresses two forensic Computer Vision tasks: detecting whether an image is real or AI-generated, and identifying which post-processing alteration has been applied to it. The model is evaluated through a rigorous ablation study over the loss weighting parameter λ, comparing multi-task joint training against unimodal baselines.
+This project implements a **unified multi-task deep learning framework** that simultaneously addresses two tasks: detecting whether an image is real or AI-generated, and identifying which post-processing alteration has been applied to it. To understand how the two tasks interact, five models are trained from scratch with different values of $\lambda$, and their results are compared against two baselines that each focus on a single task.
 
 ---
 
@@ -37,7 +37,7 @@ This project implements a **unified multi-task deep learning framework** that si
   - [Lambda Trade-off Curve](#lambda-trade-off-curve)
   - [Per-Class F1 Across Lambda](#per-class-f1-across-lambda)
   - [Domain Accuracy Breakdown Across Lambda](#domain-accuracy-breakdown-across-lambda)
-  - [Full Numeric Summary Table](#full-numeric-summary-table)
+  - [Comprehensive Evaluation Summary Table](#comprehensive_evaluation_summary_table)
   - [Unimodal Baselines vs Multi-Task](#unimodal-baselines-vs-multi-task)
 - [Repository Structure](#repository-structure)
 - [Requirements](#requirements)
@@ -48,13 +48,13 @@ This project implements a **unified multi-task deep learning framework** that si
 
 ## Problem Statement
 
-Nowadays, generative models can produce photorealistic images. These images look completely real to the human eye, which makes it easy to spread fake visual information. Computer vision researchers try to build automated detectors to distinguish real camera photographs from AI-generated fakes.
+Nowadays, generative models can produce photorealistic images. These images look real to the human eye, which makes it easy to spread fake information. Computer vision researchers try to build automated detectors to distinguish real camera photographs from AI-generated fakes.
 
 In the real world, this task is extremely difficult because images do not remain in their original, clean state but, it has almost always undergone some form of **post-processing**. For example:
 * **Internet Transfer:** Uploading a photo to social media platforms (like Instagram or WhatsApp) automatically resizes the image and applies lossy **JPEG compression** to save storage space.
 * **Re-digitalisation:** A user might print the digital image onto physical paper and then re-photograph it with a smartphone or scan it back into a computer.
 
-These operations alter the pixel values, removing the microscopic traces (like camera sensor noise) that detectors use to identify fakes.
+These operations alter the pixel values, removing the traces (like camera sensor noise) that detectors use to identify fakes.
 
 ### Our Solution
 This project builds a unified neural network, called **MultiTaskNet**, to answer two questions simultaneously from a single input image:
@@ -102,15 +102,15 @@ RRDataset_test/
 ```
 
 ### Dataset Balancing and Splits
-To ensure the model does not develop a bias towards any class (e.g., predicting "real" just because there are more real images in the dataset), we cap the total dataset size at **15,000 samples**, ensuring an equal distribution across all classes.
+To ensure the model does not develop a bias towards any class (e.g., predicting "real" just because there are more real images in the dataset), we restrict the total dataset size at **15,000 samples**, ensuring an equal distribution across all classes.
 
 We split this balanced dataset using a fixed random seed into:
-* **Training Split (70%):**, used to train the network.
-* **Validation Split (15%):**, used to tune hyperparameters and apply early stopping.
-* **Test Split (15%):**, used only for final, unbiased evaluation.
+* **Training Split (70%):** used to train the network.
+* **Validation Split (15%):** used to tune hyperparameters and apply early stopping.
+* **Test Split (15%):** used only for final, unbiased evaluation.
 
 ### Depth Maps
-To save GPU memory and training time, we pre-computed all depth maps once before traini/ng using **Depth Anything V2 (Small)**. These are saved to disk in a separate directory (`RRDataset_depth/`) as `.pt` files. During training, the dataloader loads the RGB image and its corresponding pre-computed `.pt` depth tensor at zero computational cost.
+To save GPU memory and training time, we pre-computed all depth maps once before training using **Depth Anything V2 (Small)**. These are saved to disk in a separate directory (`RRDataset_depth/`) as `.pt` files. During training, the dataloader loads the RGB image and its corresponding pre-computed `.pt` depth tensor.
 
 > **The dataset is not included in this repository.** See [How to Run](#how-to-run) for download instructions.
 
@@ -119,7 +119,7 @@ To save GPU memory and training time, we pre-computed all depth maps once before
 ## Proposed Method
 
 ### Architecture Overview
-`MultiTaskNet` contains three parallel specialist branches, intermediate fusion between RGBNet and DepthNet feature vectors, late fusion with FourierNet and two independent classification heads at the end.
+`MultiTaskNet` contains three parallel branches, intermediate fusion between RGBNet and DepthNet feature vectors, late fusion with FourierNet and two independent classification heads at the end.
 
 ![Architecture](assets/network.jpg)
 ---
@@ -155,7 +155,7 @@ These two branches are structurally identical (three convolutional blocks with G
 We fuse the three 64-dimensional embeddings in two steps:
 
 1. **Intermediate Spatial Fusion (RGB $\oplus$ Depth):**
-   We concatenate the RGB and depth embeddings (64 + 64 = 128 dimensions) and project them to 64 dimensions using `fc_stage2` (Linear(128, 64) + GELU + Dropout(0.3)). We fuse them early because both RGB and depth represent spatial pixel coordinates, allowing the model to learn spatial relationships (e.g., whether a flat texture anomaly aligns with a geometric edge).
+   We concatenate the RGB and depth embeddings (64 + 64 = 128 dimensions) and project them to 64 dimensions using `fc_stage2` (Linear(128, 64) + GELU + Dropout(0.3)). We fuse them early because both RGB and depth represent spatial pixel coordinates, allowing the model to learn spatial relationships.
 2. **Late Frequency Fusion (Visual-Geometric $\oplus$ Fourier):**
    We concatenate the 64-dimensional visual-geometric embedding and the 64-dimensional Fourier embedding (64 + 64 = 128 dimensions) and project them to the final 256-dimensional representation using `fc_stage3` (Linear(128, 256) + GELU + Dropout(0.3)). We use late fusion here because the Fourier spectrum represents global frequency statistics and has no spatial coordinates. Merging it earlier would disrupt the spatial information of the RGB and Depth CNNs.
 
@@ -208,37 +208,49 @@ These baselines use the same backbone and are trained identically, differing onl
 
 The test set is the same for all seven models (5 multi-task + 2 unimodal), enabling direct comparison. 
  
-### Learning Curves — λ = 0.5
+### Learning Curves — $\lambda$ = 0.5
 
 ![Architecture](assets/learning_curves.png)
  
+#### Loss per Epoch (Left Graph)
+
 **What it shows:** Training and validation loss over the 40 epochs run before early stopping (triggered at epoch 40, best checkpoint at epoch 35 with val_loss = 0.5289).
  
-**Observation:** Both curves decrease steadily and converge closely together, with no sign of overfitting, the gap between training and validation loss remains small throughout. This confirms that during the training phase the model is actually learning, not memorising the training set.
+**Observation:** Both curves decrease steadily and stay very close to each other. There is no sign of overfitting, meaning the model is actually learning general patterns rather than just memorising the training images.
+
+#### Validation Accuracy per Epoch (Right Graph)
+
+**What it shows:** The validation accuracy for the two tasks: **Task 1** (AI detection, blue curve) and **Task 2** (Domain/Transformation classification, orange curve).
+
+**Observation (Task 1 - Blue):** The accuracy for detecting AI images starts at 63% and jumps quickly above 75% in the first 5 epochs. It continues to rise with some minor oscillations, peaking at **83.5% at epoch 35**. At epoch 40, it drops significantly to 74.5%, which matches the loss spike on the left graph and proves why stopping at epoch 35 was the right choice.
+
+**Observation (Task 2 - Orange):** The domain classification accuracy starts at 47% (which is already much better than a 33.3% random guess for 3 classes) and increases very smoothly, settling around **60-61.5%** in the final epochs.
  
 ---
  
-### Confusion Matrices — λ = 0.5
+### Confusion Matrices — $\lambda$ = 0.5
 
 ![Architecture](assets/Confusion_Matrices.png)
  
 **What it shows:** Confusion matrices for both tasks on the test set. Each cell shows the absolute count of predicted classes.
 
-**Observation — Task 1 (AI Detection):** At $\lambda= 0.5$ , the model reaches 82.62% accuracy on the test set. Real images are classified with 87.22% recall, while AI images reach 77.89% recall. The asymmetry suggests the model is somewhat conservative, it tends to lean toward "real" when uncertain, which is the safer side from a forensic standpoint.
+**Observation — Task 1 (AI Detection):** At $\lambda= 0.5$ , the model reaches 82.62% accuracy on the test set. Real images are classified with 87.22% recall, while AI images reach 77.89% recall. The asymmetry suggests the model is somewhat conservative, it tends to lean toward "real" when uncertain, which is the safest choice.
 
-**Observation — Task 2 (Transformation Classification):** The most interesting pattern here is how differently the three classes behave. `redigital` is by far the easiest to classify correctly: precision 87.17%, recall 83.93%, F1 85.52%. This makes complete sense, indeed re-digitalization effects are more associated with colour changes and loss of light and shadow details making these features more. Consequently, the network is capable of leveraging these re-digitalization artifacts, specifically targeting colour shifts and the loss of fine details as discriminative features.
+**Observation — Task 2 (Transformation Classification):** The most interesting pattern here is how differently the three classes behave. 
+
+`redigital` is by far the easiest to classify correctly: precision 87.17%, recall 83.93%, F1 85.52%. This makes complete sense, indeed re-digitalization effects are more associated with colour changes and loss of light and shadow details making these features more evident. Consequently, the network is capable of leveraging these re-digitalization artifacts, specifically targeting colour shifts and the loss of fine details as discriminative features.
  
 `original` and `transfer`, on the other hand, are frequently confused with each other: `original` has a recall of only 23.07%, meaning most original images get mislabelled as something else, and most of the errors go toward `transfer`. This is also expected: both are natively digital formats and share very similar frequency fingerprints.
  
 ---
  
-### ROC Curves and AUC — λ = 0.5
+### ROC Curves and AUC — $\lambda$ = 0.5
 
 ![Architecture](assets/ROC_curves.png)
  
-**What it shows:** One-vs-rest ROC curves for both tasks, plotting the True Positive Rate against the False Positive Rate across all possible decision thresholds.
+**What it shows:** One-vs-rest ROC curves for both tasks, plotting the True Positive Rate against the False Positive Rate across all possible decision thresholds. The dashed diagonal line represents a random guess (AUC = 0.5). The closer the curve is to the top-left corner, the better the model is at separating the classes.
  
-**Observation:** AUC measures how well the model separates the classes regardless of which threshold you pick. For Task 1, the model achieves AUC = 0.8256 (macro), a solid result that confirms it has genuinely learnt a meaningful AI/real boundary and not just exploited a class imbalance. For Task 2, AUC = 0.5751 (macro) reflects the difficulty of the `original` vs `transfer` confusion noted above — the `redigital` curve is much higher, while the other two are closer to the diagonal.
+**Observation:** AUC measures how well the model separates the classes regardless of which threshold you pick. For Task 1, the model achieves AUC = 0.8256 (macro), a result that confirms it has learnt a meaningful AI/real boundary and not just exploited a class imbalance. For Task 2, AUC = 0.5751 (macro) reflects the difficulty of the `original` vs `transfer` confusion noted above, the `redigital` curve is much higher, while the other two are closer to the diagonal.
  
 ---
  
@@ -246,13 +258,21 @@ The test set is the same for all seven models (5 multi-task + 2 unimodal), enabl
 
 ![Architecture](assets/Lambda_Trade-off.png)
  
-**What it shows:** Overall test accuracy for Task 1 (AI detection) and Task 2 (transformation classification) plotted as a function of λ across the five independently trained models.
+**What it shows:** Overall test accuracy for Task 1 (AI detection) and Task 2 (transformation classification) plotted as a function of $\lambda$ across the five independently trained models.
  
-**Observation:** This graph directly answers the ablation study question. As λ increases, the model is asked to focus more on AI detection and less on transformation classification. The Task 1 curve rises sharply from λ = 0.1 (74.09%) to λ = 0.5 (82.62%), then plateaus and even dips slightly at λ = 0.7 (81.42%) before recovering to 82.62% at λ = 0.9. The Task 2 curve stays relatively flat between 57.91% and 60.31% across all λ values — it does not benefit from being the dominant task, but it also does not collapse when λ is high.
+**Observation:** This analysis evaluates how the loss weighting parameter $\lambda$ affects the performance of both tasks on the test set. As $\lambda$ increases, the model is asked to focus more on AI detection and less on transformation classification. 
+
+The Task 1 curve rises sharply from $\lambda = 0.1$ (74.09%) to $\lambda = 0.5$ (82.62%), then plateaus and even dips slightly at $\lambda = 0.7$ (81.42%) before recovering to 82.62% at $\lambda = 0.9$. The Task 2 curve stays relatively flat between 57.91% and 60.31% across all $\lambda$ values, it does not benefit from being the dominant task, but it also does not collapse when $\lambda$ is high.
  
-The two curves intersect at λ = 0.5, which represents the point at which neither activity comes at the expense of the other. This is what justifies the choice of λ = 0.5 as the primary model: it is where the two objectives are balanced and Task 1 accuracy is already near its maximum.
+The two curves do not cross because Task 1 is easier than Task 2, so their baseline accuracies are different. Instead, we look for the best compromise:
+1.  **Diminishing Returns for Task 1:** 
+    If we set $\lambda = 0.9$, we tell the network to ignore the domain classification task. However, this focus does not make the AI detection any better (it stays at 82.6%), while it hurts the domain classification accuracy (which drops to its lowest at 57.9%).
+2.  **Severe Penalty for Low Lambdas:** 
+    If we set $\lambda = 0.1$, we focus too much on the domain, causing a massive 8.5% drop in our primary task of detecting AI fakes.
+3.  **The Perfect Balance:** 
+    At $\lambda = 0.5$, we get the best of both worlds. The model achieves the maximum possible AI detection accuracy (82.6%) while keeping the domain classification accuracy stable and competitive (59.5%). This confirms that a balanced loss allows the shared features in the backbone to support both tasks effectively.
  
-| λ | Task 1 Acc (AI detection) | Task 2 Acc (Transform) |
+| $\lambda$ | Task 1 Acc (AI detection) | Task 2 Acc (Transform) |
 |---|---|---|
 | 0.1 | 74.09% | 60.04% |
 | 0.3 | 81.29% | 59.91% |
@@ -267,31 +287,19 @@ The two curves intersect at λ = 0.5, which represents the point at which neithe
 ![Architecture](assets/Per-Class_F1_Across_Lambda1.png)
 ![Architecture](assets/Per-Class_F1_Across_Lambda2.png)
  
-**What it shows:** A heatmap where each row is a λ value and each column is a class, showing the F1-score for that class on the test set. Displayed separately for Task 1 (2 classes) and Task 2 (3 classes).
+**What it shows:** These heatmaps display the F1-score for each individual class on the test set across our grid of $\lambda$ values. By looking at specific classes rather than overall accuracy, we can see exactly which categories benefit from the multi-task setup and which ones are in competition.
  
-**Observation:** This is one of the most informative views of the ablation study because it shows not just whether overall accuracy changes with λ, but *which classes are affected and how*.
- 
-For **Task 1 (AI detection)**, both classes benefit from increasing λ up to a point. The `real` class F1 is fairly stable across the grid (0.7196 at λ = 0.1, peaking at 0.8372 at λ = 0.9), while the `ai` class improves more sharply from 0.1 to 0.3 (0.7592 → 0.7955) and then plateaus. At λ = 0.5, both classes are well-balanced (F1 `real` = 0.8359, F1 `ai` = 0.8153), which confirms this is the most stable operating point.
- 
-| λ | F1 — real | F1 — ai |
-|---|---|---|
-| 0.1 | 0.7196 | 0.7592 |
-| 0.3 | 0.8275 | 0.7955 |
-| **0.5** | **0.8359** | **0.8153** |
-| 0.7 | 0.8270 | 0.7994 |
-| 0.9 | 0.8372 | 0.8137 |
- 
-For **Task 2 (transformation classification)**, the heatmap tells a much more interesting story. `redigital` has consistently high F1 across all λ values (0.8537 at λ = 0.1, 0.8552 at λ = 0.5), confirming it is a structurally easy class regardless of how the loss is weighted. `original` and `transfer`, on the other hand, trade off against each other as λ changes — a pattern that reveals genuine representational competition between these two similar classes.
- 
-At λ = 0.7, `original` reaches F1 = 0.5686 while `transfer` drops to 0.3464: the model is concentrating capacity on AI detection and loses precision on the harder domain boundary. At λ = 0.1, the opposite happens — `transfer` climbs to 0.5994 while `original` falls to 0.1911. At λ = 0.9, both converge to 0.4651, suggesting the backbone is producing a more generic representation that no longer favours either class. λ = 0.5 offers the most balanced trade-off between the two (F1 `original` = 0.3024, F1 `transfer` = 0.5676).
- 
-| λ | F1 — original | F1 — redigital | F1 — transfer |
-|---|---|---|---|
-| 0.1 | 0.1911 | 0.8537 | 0.5994 |
-| 0.3 | 0.3505 | 0.8666 | 0.5416 |
-| **0.5** | **0.3024** | **0.8552** | **0.5676** |
-| 0.7 | 0.5686 | 0.8347 | 0.3464 |
-| 0.9 | 0.4651 | 0.7933 | 0.4651 |
+**Observation:**
+*   **Task 1 (AI Detection - Left Heatmap):** At $\lambda = 0.1$ (low priority for AI detection), the scores are low. However, once we reach $\lambda \geq 0.3$, the F1-scores for both `real` (~0.83) and `ai` (~0.81) become highly stable. At our chosen setting ($\lambda = 0.5$), the scores are perfectly balanced (F1 `real` = 0.836, F1 `ai` = 0.815).
+*   **Task 2 (Transformation Type - Right Heatmap):** 
+    *   The `redigital` class maintains a consistently high F1-score (~0.85) at all $\lambda$ levels, proving it is extremely easy to identify.
+    *   The `original` (clean digital) and `transfer` (internet compressed) classes show a clear **trade-off (competition)**. At $\lambda = 0.1$ (focus on domain), `transfer` climbs to 0.599 but `original` collapses to 0.191. At $\lambda = 0.7$, the opposite occurs: `original` reaches 0.569 while `transfer` drops to 0.346.
+    *   At our selected $\lambda = 0.5$, we achieve the most stable compromise (F1 `original` = 0.302, F1 `transfer` = 0.568).
+
+`original` and `transfer` compete so intensely because they both are purely digital domains. The only difference between a clean native photo (`original`) and a social media upload (`transfer`) is lossy JPEG compression and minor resizing. Because these two domains are highly similar, they compete for the model's attention.
+
+**$\lambda = 0.5$ is the fairest compromise:** 
+If we tune the loss too much towards one side, one of the two digital classes completely collapses (e.g., F1 of `original` drops to 0.191 at $\lambda = 0.1$). Setting $\lambda = 0.5$ forces the shared backbone to learn a balanced feature space, preventing either class from failing entirely.
 
 ---
  
@@ -299,13 +307,17 @@ At λ = 0.7, `original` reaches F1 = 0.5686 while `transfer` drops to 0.3464: th
 
 ![Architecture](assets/Domain_Accuracy_Breakdown_Across_Lambda.png)
  
-**What it shows:** AI detection accuracy (Task 1) broken down separately for each post-processing category — `original`, `redigital`, `transfer` — for all five λ values simultaneously, displayed as a grouped bar chart.
+**What it shows:** This grouped bar chart displays the AI detection accuracy (Task 1) separately for each image domain (`original`, `redigital`, `transfer`) across our five trained models. It directly answers the core question: *how well does our model detect AI fakes when the images have been compressed or printed and scanned?*
  
-**Observation:** This directly addresses the project requirement to "analyse how different degradation types affect AI detection performance." The result is quite clear: `transfer` (internet-transmitted) images are consistently the easiest domain for the model to classify correctly across all λ values (up to 84.34% at λ = 0.5), while `redigital` is the most challenging (68.53% at λ = 0.1, reaching 81.27% at λ = 0.9). `original` sits in between.
+**Observation:** 
+
+*   **The Trend:** For all three categories, the AI detection accuracy increases significantly as the loss weight $\lambda$ moves from 0.1 to 0.3-0.5, and then stabilizes. 
+*   **The Domains:** 
+    *   `transfer` (internet compressed) is consistently the easiest domain for the model to classify, peaking at **84.34%** at $\lambda = 0.5$.
+    *   `redigital` (printed and scanned) is the most challenging domain, starting at 68.53% at $\lambda = 0.1$ and reaching a maximum of **81.27%** at $\lambda = 0.9$.
+    *   `original` (clean digital) sits in the middle, reaching **82.93%** at $\lambda = 0.5$.
  
-This pattern makes sense: internet transmission introduces compression artefacts and resizing that alter both the RGB texture and the frequency spectrum in predictable ways, making AI vs real easier to distinguish. Re-digitised images, instead, accumulate noise from the physical scan that partially masks the original AI generation fingerprint, making detection harder. Across all domains, performance improves significantly as λ moves from 0.1 to 0.3-0.5, then stabilises.
- 
-| λ | original | redigital | transfer |
+| $\lambda$ | original | redigital | transfer |
 |---|---|---|---|
 | 0.1 | 76.27% | 68.53% | 77.51% |
 | 0.3 | 82.13% | 79.68% | 82.06% |
@@ -315,9 +327,9 @@ This pattern makes sense: internet transmission introduces compression artefacts
  
 ---
  
-### Full Numeric Summary Table
+### Comprehensive Evaluation Summary Table
  
-The consolidated reference table for the entire ablation study. All metrics are computed on the shared test set.
+This table is the reference containing all key quantitative metrics computed on the shared test set. It consolidates the overall Accuracy and Macro-F1 scores for both tasks, alongside the specific AI detection accuracies across the three post-processing domains (`original`, `redigital`, `transfer`), for all five trained models.
  
 | λ | Task 1 Acc | Task 1 Macro-F1 | Task 2 Acc | Task 2 Macro-F1 | AI acc – original | AI acc – redigital | AI acc – transfer |
 |---|---|---|---|---|---|---|---|
@@ -333,15 +345,22 @@ The consolidated reference table for the entire ablation study. All metrics are 
 
 ![Architecture](assets/Unimodal_Baselines_vs_Multi-Task.png)
  
-**What it shows:** A direct comparison between the five multi-task models and two unimodal baselines: `UnimodalNetAI` (λ = 1.0, trained on AI detection only) and `UnimodalNetDomain` (λ = 0.0, trained on transformation classification only). All models share the same backbone and training setup.
+**What it shows:** A direct comparison between the five multi-task models and two unimodal baselines: `UnimodalNetAI` (λ = 1.0, trained on AI detection only) and `UnimodalNetDomain` (λ = 0.0, trained on transformation classification only). All models share the same backbone and training setup. This comparison proves whether joint training helps or hurts performance.
  
-**Observation:** Does joint training help?
+**Observation:** 
+*   **Unimodal Specialists at Chance Level:**
+    *   The AI-only model ($\lambda = 1.0$) reaches 81.2% accuracy on Task 1, but scores exactly **33.3%** on Task 2. This is a random guess for a 3-class problem.
+    *   The Domain-only model ($\lambda = 0.0$) reaches 59.6% accuracy on Task 2, but scores **50.8%** on Task 1, which is a random guess for a binary classification task.
+*   **The Multi-Task Advantage ($\lambda = 0.5$):**
+    *   **Task 1 (AI Detection):** The joint model achieves **82.6%** accuracy, which actually **outperforms** the unimodal AI specialist (81.2%) by 1.4 percentage points.
+    *   **Task 2 (Domain Classification):** The joint model achieves **59.5%** accuracy, which is practically identical to the unimodal domain specialist (59.6%).
  
-For **Task 1 (AI detection)**, the unimodal specialist (`UnimodalNetAI`, λ = 1.0) reaches a best validation accuracy of 82.36% and never learns anything useful about transformations (val_acc_domain stays flat at 48.40% throughout training — exactly the class prior, meaning it always predicts the same class). The best multi-task model at λ = 0.5 matches this on Task 1 (82.62%) while simultaneously achieving 59.47% on Task 2. This means joint training does not hurt Task 1 at all, and gives Task 2 for free.
- 
-For **Task 2 (transformation classification)**, the unimodal specialist (`UnimodalNetDomain`, λ = 0.0) tops out at around 62.80% validation accuracy, with a test performance around 60%. The multi-task models reach a comparable 59-60% on Task 2 while also delivering strong Task 1 performance. The cost of joint training on Task 2 is minimal — less than 1–2 percentage points — and the benefit is a full AI detection capability that the unimodal domain model completely lacks.
- 
-The conclusion is that the two tasks are more complementary than competitive: learning to detect AI-generated images and learning to identify post-processing operations share a useful common representation, and the shared backbone can serve both without a significant sacrifice on either side.
+1.  **Preventing Overfitting:** 
+    Intuitively, a model like **UnimodalNetAI** should perform best on its single task, but the test results show it actually performs worse, scoring 81.2% compared to the joint model's 82.6%. Without a secondary task, the network easily overfits to the clean, ideal patterns in the training data. Introducing the domain classification task acts as a form of regularization. It forces the shared backbone to learn features that remain stable under compression and scanning, which makes the AI detection much more robust on unseen test data.
+2.  **Computational Efficiency:** 
+    Training a single **MultiTaskNet** model with $\lambda = 0.5$ allows us to solve both tasks simultaneously without any real compromise. The joint model matches the performance of the specialized domain network (59.5% versus 59.6%) and even outperforms the specialized AI detector. This approach cuts the number of parameters and training time in half, providing a highly efficient alternative to deploying two independent networks.
+3.  **Functional Synergy:** 
+    The two tasks work together in a complementary way. By learning how an image was altered, such as identifying compression grids or printer noise, the network gets better at separating these post-processing artifacts from the actual generative fingerprints. Understanding the type of degradation helps the model filter out irrelevant noise, which directly improves its ability to judge if the underlying image is a real photograph or an AI-generated fake.
  
 ---
 
@@ -430,7 +449,7 @@ RRDataset_depth/
     └── transfer/
 ```
 
-> ⚠️ This step requires an internet connection on first run to download the Depth Anything V2 checkpoint. Subsequent runs use the cached tensors.
+> This step requires an internet connection on first run to download the Depth Anything V2 checkpoint. Subsequent runs use the cached tensors.
 
 ### 4. Run the notebook
 
