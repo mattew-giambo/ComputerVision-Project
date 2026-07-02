@@ -35,6 +35,7 @@ This project implements a **unified multi-task deep learning framework** that si
   - [Confusion Matrices — λ = 0.5](#confusion-matrices--λ--05)
   - [ROC Curves and AUC — λ = 0.5](#roc-curves-and-auc--λ--05)
   - [Lambda Trade-off Curve](#lambda-trade-off-curve)
+  - [Per-Class F1 Across Lambda](#per-class-f1-across-lambda)
   - [Domain Accuracy Breakdown Across Lambda](#domain-accuracy-breakdown-across-lambda)
   - [Full Numeric Summary Table](#full-numeric-summary-table)
   - [Unimodal Baselines vs Multi-Task](#unimodal-baselines-vs-multi-task)
@@ -120,6 +121,7 @@ To save GPU memory and training time, we pre-computed all depth maps once before
 ### Architecture Overview
 `MultiTaskNet` contains three parallel specialist branches in Stage 1, a two-step fusion block (Stage 2 and Stage 3), and two independent classification heads at the end.
 
+![Architecture](assets/network.jpg)
 ---
 
 ### Offline Depth Pre-Computation
@@ -210,6 +212,8 @@ These baselines use the same backbone and are trained identically, differing onl
 The test set is the same for all seven models (5 multi-task + 2 unimodal), enabling direct comparison. 
  
 ### Learning Curves — λ = 0.5
+
+![Architecture](assets/learning_curves.png)
  
 **What it shows:** Training and validation loss over the 40 epochs run before early stopping (triggered at epoch 40, best checkpoint at epoch 35 with val_loss = 0.5289).
  
@@ -218,6 +222,8 @@ The test set is the same for all seven models (5 multi-task + 2 unimodal), enabl
 ---
  
 ### Confusion Matrices — λ = 0.5
+
+![Architecture](assets/Confusion_Matrices.png)
  
 **What it shows:** Row-normalised confusion matrices for both tasks on the test set. Each cell shows the absolute count and the row percentage.
  
@@ -230,6 +236,8 @@ The test set is the same for all seven models (5 multi-task + 2 unimodal), enabl
 ---
  
 ### ROC Curves and AUC — λ = 0.5
+
+![Architecture](assets/ROC_curves.png)
  
 **What it shows:** One-vs-rest ROC curves for both tasks, plotting the True Positive Rate against the False Positive Rate across all possible decision thresholds.
  
@@ -238,6 +246,8 @@ The test set is the same for all seven models (5 multi-task + 2 unimodal), enabl
 ---
  
 ### Lambda Trade-off Curve
+
+![Architecture](assets/Lambda_Trade-off.png)
  
 **What it shows:** Overall test accuracy for Task 1 (AI detection) and Task 2 (transformation classification) plotted as a function of λ across the five independently trained models.
  
@@ -255,7 +265,42 @@ The two curves intersect at λ = 0.5, which represents the point at which neithe
  
 ---
  
+### Per-Class F1 Across Lambda
+
+![Architecture](assets/Per-Class_F1_Across_Lambda1.png)
+![Architecture](assets/Per-Class_F1_Across_Lambda2.png)
+ 
+**What it shows:** A heatmap where each row is a λ value and each column is a class, showing the F1-score for that class on the test set. Displayed separately for Task 1 (2 classes) and Task 2 (3 classes).
+ 
+**Observation:** This is one of the most informative views of the ablation study because it shows not just whether overall accuracy changes with λ, but *which classes are affected and how*.
+ 
+For **Task 1 (AI detection)**, both classes benefit from increasing λ up to a point. The `real` class F1 is fairly stable across the grid (0.7196 at λ = 0.1, peaking at 0.8372 at λ = 0.9), while the `ai` class improves more sharply from 0.1 to 0.3 (0.7592 → 0.7955) and then plateaus. At λ = 0.5, both classes are well-balanced (F1 `real` = 0.8359, F1 `ai` = 0.8153), which confirms this is the most stable operating point.
+ 
+| λ | F1 — real | F1 — ai |
+|---|---|---|
+| 0.1 | 0.7196 | 0.7592 |
+| 0.3 | 0.8275 | 0.7955 |
+| **0.5** | **0.8359** | **0.8153** |
+| 0.7 | 0.8270 | 0.7994 |
+| 0.9 | 0.8372 | 0.8137 |
+ 
+For **Task 2 (transformation classification)**, the heatmap tells a much more interesting story. `redigital` has consistently high F1 across all λ values (0.8537 at λ = 0.1, 0.8552 at λ = 0.5), confirming it is a structurally easy class regardless of how the loss is weighted. `original` and `transfer`, on the other hand, trade off against each other as λ changes — a pattern that reveals genuine representational competition between these two similar classes.
+ 
+At λ = 0.7, `original` reaches F1 = 0.5686 while `transfer` drops to 0.3464: the model is concentrating capacity on AI detection and loses precision on the harder domain boundary. At λ = 0.1, the opposite happens — `transfer` climbs to 0.5994 while `original` falls to 0.1911. At λ = 0.9, both converge to 0.4651, suggesting the backbone is producing a more generic representation that no longer favours either class. λ = 0.5 offers the most balanced trade-off between the two (F1 `original` = 0.3024, F1 `transfer` = 0.5676).
+ 
+| λ | F1 — original | F1 — redigital | F1 — transfer |
+|---|---|---|---|
+| 0.1 | 0.1911 | 0.8537 | 0.5994 |
+| 0.3 | 0.3505 | 0.8666 | 0.5416 |
+| **0.5** | **0.3024** | **0.8552** | **0.5676** |
+| 0.7 | 0.5686 | 0.8347 | 0.3464 |
+| 0.9 | 0.4651 | 0.7933 | 0.4651 |
+
+---
+ 
 ### Domain Accuracy Breakdown Across Lambda
+
+![Architecture](assets/Domain_Accuracy_Breakdown_Across_Lambda.png)
  
 **What it shows:** AI detection accuracy (Task 1) broken down separately for each post-processing category — `original`, `redigital`, `transfer` — for all five λ values simultaneously, displayed as a grouped bar chart.
  
@@ -288,6 +333,8 @@ The consolidated reference table for the entire ablation study. All metrics are 
 ---
  
 ### Unimodal Baselines vs Multi-Task
+
+![Architecture](assets/Unimodal_Baselines_vs_Multi-Task.png)
  
 **What it shows:** A direct comparison between the five multi-task models and two unimodal baselines: `UnimodalNetAI` (λ = 1.0, trained on AI detection only) and `UnimodalNetDomain` (λ = 0.0, trained on transformation classification only). All models share the same backbone and training setup.
  
@@ -305,10 +352,10 @@ The conclusion is that the two tasks are more complementary than competitive: le
 
 ```
 .
-├── project_definitivo.ipynb   # Full notebook: Imports → Globals → Utils → Data → Network → Train → Test
-├── network.pdf                # Architecture diagram
-├── presentation/              # Project slides (PDF or PPTX)
-├── checkpoints/               # Saved model weights (.pth) — generated at training time
+├── project_definitivo.ipynb
+├── assets/
+├── presentation/              
+├── checkpoints/               
 │   ├── model_lambda_0.1.pth
 │   ├── model_lambda_0.3.pth
 │   ├── model_lambda_0.5.pth
@@ -320,7 +367,7 @@ The conclusion is that the two tasks are more complementary than competitive: le
 └── README.md
 ```
 
-The notebook follows the mandatory course structure: **Imports → Globals → Utils → Data → Network → Train → Test**.
+The notebook follows the structure: **Imports → Globals → Utils → Data → Network → Train → Test**.
 
 ---
 
@@ -356,7 +403,7 @@ cd <repo-name>
 
 ### 2. Download the dataset
 
-Download **RRDataset** and place it in the project root:
+Download **RRDataset** from [Zenodo](https://zenodo.org/records/14963880) and place it in the project root:
 
 ```
 RRDataset_test/
