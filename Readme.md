@@ -234,7 +234,7 @@ The test set is the same for all seven models (5 multi-task + 2 unimodal), enabl
  
 **What it shows:** Confusion matrices for both tasks on the test set. Each cell shows the absolute count of predicted classes.
 
-**Observation — Task 1 (AI Detection):** At $\lambda= 0.5$ , the model reaches 82.62% accuracy on the test set. Real images are classified with 87.22% recall, while AI images reach 77.89% recall. The asymmetry suggests the model is somewhat conservative, it tends to lean toward "real" when uncertain, which is the safest choice.
+**Observation — Task 1 (AI Detection):** At $\lambda= 0.5$ , the model reaches 82.62% accuracy on the test set. Real images are classified with 87.22% recall, while AI images reach 77.89% recall. The asymmetry suggests the model is somewhat conservative, it tends to predict "real" when uncertain, which is the safest choice.
 
 **Observation — Task 2 (Transformation Classification):** The most interesting pattern here is how differently the three classes behave. 
 
@@ -248,9 +248,9 @@ The test set is the same for all seven models (5 multi-task + 2 unimodal), enabl
 
 ![Architecture](assets/ROC_curves.png)
  
-**What it shows:** One-vs-rest ROC curves for both tasks, plotting the True Positive Rate against the False Positive Rate across all possible decision thresholds. The dashed diagonal line represents a random guess (AUC = 0.5). The closer the curve is to the top-left corner, the better the model is at separating the classes.
+**What it shows:** The ROC curves for both tasks, plotting the True Positive Rate against the False Positive Rate across all possible decision thresholds. The dashed diagonal line represents a random guess (AUC = 0.5). The closer the curve is to the top-left corner, the better the model is at separating the classes.
  
-**Observation:** AUC measures how well the model separates the classes regardless of which threshold you pick. For Task 1, the model achieves AUC = 0.8256 (macro), a result that confirms it has learnt a meaningful AI/real boundary and not just exploited a class imbalance. For Task 2, AUC = 0.5751 (macro) reflects the difficulty of the `original` vs `transfer` confusion noted above, the `redigital` curve is much higher, while the other two are closer to the diagonal.
+**Observation:** AUC (Area Under Curve) measures how well the model separates the classes regardless of which threshold you pick. For Task 1, the model achieves AUC = 0.8256, a result that confirms it has learnt a meaningful AI/real boundary and not just exploited a class imbalance. For Task 2, AUC = 0.5751 reflects the difficulty of the `original` vs `transfer` confusion noted above, the `redigital` curve is much higher, while the other two are closer to the diagonal.
  
 ---
  
@@ -262,7 +262,7 @@ The test set is the same for all seven models (5 multi-task + 2 unimodal), enabl
  
 **Observation:** This analysis evaluates how the loss weighting parameter $\lambda$ affects the performance of both tasks on the test set. As $\lambda$ increases, the model is asked to focus more on AI detection and less on transformation classification. 
 
-The Task 1 curve rises sharply from $\lambda = 0.1$ (74.09%) to $\lambda = 0.5$ (82.62%), then plateaus and even dips slightly at $\lambda = 0.7$ (81.42%) before recovering to 82.62% at $\lambda = 0.9$. The Task 2 curve stays relatively flat between 57.91% and 60.31% across all $\lambda$ values, it does not benefit from being the dominant task, but it also does not collapse when $\lambda$ is high.
+The Task 1 curve rises from $\lambda = 0.1$ (74.09%) to $\lambda = 0.5$ (82.62%), then plateaus and even dips slightly at $\lambda = 0.7$ (81.42%) before recovering to 82.62% at $\lambda = 0.9$. The Task 2 curve stays relatively flat between 57.91% and 60.31% across all $\lambda$ values, it does not benefit from being the dominant task, but it also does not collapse when $\lambda$ is high.
  
 The two curves do not cross because Task 1 is easier than Task 2, so their baseline accuracies are different. Instead, we look for the best compromise:
 1.  **Diminishing Returns for Task 1:** 
@@ -349,8 +349,8 @@ This table is the reference containing all key quantitative metrics computed on 
  
 **Observation:** 
 *   **Unimodal Specialists at Chance Level:**
-    *   The AI-only model ($\lambda = 1.0$) reaches 81.2% accuracy on Task 1, but scores exactly **33.3%** on Task 2. This is a random guess for a 3-class problem.
-    *   The Domain-only model ($\lambda = 0.0$) reaches 59.6% accuracy on Task 2, but scores **50.8%** on Task 1, which is a random guess for a binary classification task.
+    *   The AI-only model ($\lambda = 1.0$) reaches 81.2% accuracy.
+    *   The Domain-only model ($\lambda = 0.0$) reaches 59.6% accuracy.
 *   **The Multi-Task Advantage ($\lambda = 0.5$):**
     *   **Task 1 (AI Detection):** The joint model achieves **82.6%** accuracy, which actually **outperforms** the unimodal AI specialist (81.2%) by 1.4 percentage points.
     *   **Task 2 (Domain Classification):** The joint model achieves **59.5%** accuracy, which is practically identical to the unimodal domain specialist (59.6%).
