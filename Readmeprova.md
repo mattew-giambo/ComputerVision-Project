@@ -119,7 +119,7 @@ To save GPU memory and training time, we pre-computed all depth maps once before
 ## Proposed Method
 
 ### Architecture Overview
-`MultiTaskNet` contains three parallel specialist branches in Stage 1, a two-step fusion block (Stage 2 and Stage 3), and two independent classification heads at the end.
+`MultiTaskNet` contains three parallel specialist branches, intermediate fusion between RGBNet and DepthNet feature vectors, late fusion with FourierNet and two independent classification heads at the end.
 
 ![Architecture](assets/network.jpg)
 ---
@@ -127,39 +127,37 @@ To save GPU memory and training time, we pre-computed all depth maps once before
 ### Offline Depth Pre-Computation
 Instead of running MDE in real time during training, we pre-compute depth maps offline:
 * Load the pre-trained Depth Anything V2 (Small) model.
-* Pass each RGB image through it to get a 2D depth map.
+* Compute the Forward Pass for each RGB image to get a 2D depth map.
 * Interpolate the map to 224x224 and normalize values to `[0, 1]`.
 * Save the map as a `.pt` tensor.
 
 ---
 
-### FourierNet Branch and Log-Magnitude Input
+### FourierNet Branch
 The frequency branch converts the RGB image into the frequency domain:
 1. **FFT:** Apply the 2D Fast Fourier Transform to the 3-channel RGB image.
-2. **Shift:** Shift the zero-frequency component to the center of the spectrum.
-3. **Decompose:** Separate the complex numbers into a 3-channel magnitude spectrum and a 3-channel phase spectrum.
-4. **Log-compression:** Apply `log(|X| + 1)` to the magnitude spectrum to scale down the dominant DC (zero-frequency) value, making the higher-frequency patterns visible.
-5. **Concat:** Concatenate the magnitude and phase spectra along the channel dimension, producing a 6-channel input tensor (shape `[B, 6, 224, 224]`).
+2. **Log-compression:** Apply `log(|X| + 1)` to the magnitude spectrum to scale down the dominant low-frequencies components, making the higher-frequency patterns visible.
+3. **Concat:** Concatenate the magnitude and phase spectrum along the channel dimension, producing a 6-channel input tensor (shape `[B, 6, 224, 224]`).
 
 This tensor is processed by `FourierNet` (three convolutional blocks with ReLU activations, global average pooling, and a fully connected layer), outputting a **64-dimensional frequency embedding**.
 
 ---
 
 ### RGB and Depth Branches
-* **RGBNet** processes the 3-channel RGB image to extract spatial colors and textures, outputting a 64-dimensional spatial embedding.
+* **RGBNet** processes the 3-channel RGB image to extract spatial colours and textures, outputting a 64-dimensional spatial embedding.
 * **DepthNet** processes the 1-channel pre-computed depth map to extract 3D volumetric shapes, outputting a 64-dimensional geometric embedding.
 
-These two branches are structurally identical (three convolutional blocks with GELU activations, global pooling, and fully connected bottleneck) but **never share weights** to prevent color information from contaminating geometric feature extraction in Stage 1.
+These two branches are structurally identical (three convolutional blocks with GELU activations, global pooling, and fully connected bottleneck) but **never share weights** to prevent colour information from contaminating geometric feature extraction.
 
 ---
 
 ### Hierarchical Multi-Stage Fusion (RGB-D and Fourier)
 We fuse the three 64-dimensional embeddings in two steps:
 
-1. **Stage 2 — Intermediate Spatial Fusion (RGB ⊕ Depth):**
+1. **Intermediate Spatial Fusion (RGB $\oplus$ Depth):**
    We concatenate the RGB and depth embeddings (64 + 64 = 128 dimensions) and project them to 64 dimensions using `fc_stage2` (Linear(128, 64) + GELU + Dropout(0.3)). We fuse them early because both RGB and depth represent spatial pixel coordinates, allowing the model to learn spatial relationships (e.g., whether a flat texture anomaly aligns with a geometric edge).
-2. **Stage 3 — Late Frequency Fusion (Visual-Geometric ⊕ Fourier):**
-   We concatenate the 64-dimensional visual-geometric embedding and the 64-dimensional Fourier embedding (64 + 64 = 128 dimensions) and project them to the final 256-dimensional representation using `fc_stage3` (Linear(128, 256) + GELU + Dropout(0.3)). We use late fusion here because the Fourier spectrum represents global frequency statistics and has no spatial coordinates. Merging it earlier would disrupt the spatial filters of the RGB and Depth CNNs.
+2. **Late Frequency Fusion (Visual-Geometric $\oplus$ Fourier):**
+   We concatenate the 64-dimensional visual-geometric embedding and the 64-dimensional Fourier embedding (64 + 64 = 128 dimensions) and project them to the final 256-dimensional representation using `fc_stage3` (Linear(128, 256) + GELU + Dropout(0.3)). We use late fusion here because the Fourier spectrum represents global frequency statistics and has no spatial coordinates. Merging it earlier would disrupt the spatial information of the RGB and Depth CNNs.
 
 ---
 
@@ -180,14 +178,14 @@ Where:
 * $\mathcal{L}_{\text{domain}}$ is the Cross-Entropy loss for Task 2.
 * $\lambda \in [0, 1]$ is the scalar weighting parameter that controls the trade-off between the two tasks.
 
-Five **fully independent** models are trained from scratch, one for each value of λ. Each model uses a fixed λ for its entire training schedule. 
+Five **fully independent** models are trained from scratch, one for each value of $\lambda = \left\{0.1, 0.3, 0.5, 0.7, 0.9\right\}$. Each model uses a fixed $\lambda$ for its entire training schedule. 
 
 ### Unimodal Baselines
 
 Two additional models are trained as baselines for comparison:
 
-- **UnimodalNetAI** (λ = 1.0): trained on Task 1 only (AI detection)
-- **UnimodalNetDomain** (λ = 0.0): trained on Task 2 only (transformation classification)
+- **UnimodalNetAI** ($\lambda = 1.0$): trained on Task 1 only (AI detection)
+- **UnimodalNetDomain** ($\lambda = 0.0$): trained on Task 2 only (transformation classification)
 
 These baselines use the same backbone and are trained identically, differing only in which task loss is optimised.
 
@@ -202,7 +200,6 @@ These baselines use the same backbone and are trained identically, differing onl
 | Batch size | 100 |
 | Max epochs | 50 |
 | Early stopping patience | 5 |
-| Mixed precision | AMP (torch.amp) |
 | Seed | 42 |
 
 ---
@@ -217,7 +214,7 @@ The test set is the same for all seven models (5 multi-task + 2 unimodal), enabl
  
 **What it shows:** Training and validation loss over the 40 epochs run before early stopping (triggered at epoch 40, best checkpoint at epoch 35 with val_loss = 0.5289).
  
-**Observation:** Both curves decrease steadily and converge closely together, with no sign of overfitting — the gap between training and validation loss remains small throughout. This confirms that the training procedure is healthy: the model is actually learning, not memorising the training set.
+**Observation:** Both curves decrease steadily and converge closely together, with no sign of overfitting, the gap between training and validation loss remains small throughout. This confirms that during the training phase the model is actually learning, not memorising the training set.
  
 ---
  
@@ -225,13 +222,13 @@ The test set is the same for all seven models (5 multi-task + 2 unimodal), enabl
 
 ![Architecture](assets/Confusion_Matrices.png)
  
-**What it shows:** Row-normalised confusion matrices for both tasks on the test set. Each cell shows the absolute count and the row percentage.
+**What it shows:** Confusion matrices for both tasks on the test set. Each cell shows the absolute count of predicted classes.
+
+**Observation — Task 1 (AI Detection):** At $\lambda= 0.5$ , the model reaches 82.62% accuracy on the test set. Real images are classified with 87.22% recall, while AI images reach 77.89% recall. The asymmetry suggests the model is somewhat conservative, it tends to lean toward "real" when uncertain, which is the safer side from a forensic standpoint.
+
+**Observation — Task 2 (Transformation Classification):** The most interesting pattern here is how differently the three classes behave. `redigital` is by far the easiest to classify correctly: precision 87.17%, recall 83.93%, F1 85.52%. This makes complete sense, indeed re-digitalization effects are more associated with colour changes and loss of light and shadow details making these features more. Consequently, the network is capable of leveraging these re-digitalization artifacts, specifically targeting colour shifts and the loss of fine details as discriminative features.
  
-**Observation — Task 2 (Transformation Classification):** The most interesting pattern here is how differently the three classes behave. `redigital` is by far the easiest to classify correctly: precision 87.17%, recall 83.93%, F1 85.52%. This makes complete sense — the print-and-scan pipeline introduces very specific high-frequency artefacts (halftone patterns, scanner noise) that the Fourier branch picks up almost immediately.
- 
-`original` and `transfer`, on the other hand, are frequently confused with each other: `original` has a recall of only 23.07%, meaning most original images get mislabelled as something else, and most of the errors go toward `transfer`. This is also expected: both are natively digital formats and share very similar frequency fingerprints. There is no physical degradation to tell them apart — the model has to rely on subtler statistical differences, which is genuinely hard.
- 
-**Observation — Task 1 (AI Detection):** At λ = 0.5, the model reaches 82.62% accuracy on the test set. Real images are classified with 87.22% recall, while AI images reach 77.89% recall. The asymmetry suggests the model is somewhat conservative — it tends to lean toward "real" when uncertain, which is the safer side from a forensic standpoint.
+`original` and `transfer`, on the other hand, are frequently confused with each other: `original` has a recall of only 23.07%, meaning most original images get mislabelled as something else, and most of the errors go toward `transfer`. This is also expected: both are natively digital formats and share very similar frequency fingerprints.
  
 ---
  
