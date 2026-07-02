@@ -345,7 +345,7 @@ This table is the reference containing all key quantitative metrics computed on 
 
 ![Architecture](assets/Unimodal_Baselines_vs_Multi-Task.png)
  
-**What it shows:** A direct comparison between the five multi-task models and two unimodal baselines: `UnimodalNetAI` (λ = 1.0, trained on AI detection only) and `UnimodalNetDomain` (λ = 0.0, trained on transformation classification only). All models share the same backbone and training setup. This comparison proves whether joint training helps or hurts performance.
+**What it shows:** A direct comparison between the five multi-task models and two unimodal baselines: `UnimodalNetAI` ($\lambda = 1.0$, trained on AI detection only) and `UnimodalNetDomain` ($\lambda = 0.0$, trained on transformation classification only). All models share the same backbone and training setup. This comparison proves whether joint training helps or hurts performance.
  
 **Observation:** 
 *   **Unimodal Specialists at Chance Level:**
