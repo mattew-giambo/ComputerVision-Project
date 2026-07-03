@@ -5,7 +5,7 @@
 * **Course:** Computer Vision (M.Sc. in Engineering in Computer Science & Artificial Intelligence)
 * **Academic Year:** 2025/2026
 * **Professor:** Prof. Irene Amerini
-* **Authors:** [Benvenuto Ida Francesca 2045045, Casolino Ilaria 2079322, Giamberardini Matteo 2045678]
+* **Authors:** [Casolino Ilaria 2079322, Giamberardini Matteo 2045678]
 
 ---
 
@@ -31,9 +31,9 @@ This project implements a **unified multi-task deep learning framework** that si
   - [Unimodal Baselines](#unimodal-baselines)
 - [Experimental Setup](#experimental-setup)
 - [Model Evaluation](#model-evaluation)
-  - [Learning Curves — λ = 0.5](#learning-curves--λ--05)
-  - [Confusion Matrices — λ = 0.5](#confusion-matrices--λ--05)
-  - [ROC Curves and AUC — λ = 0.5](#roc-curves-and-auc--λ--05)
+  - [Learning Curves — $\lambda = 0.5$](#learning-curves--λ--05)
+  - [Confusion Matrices — $\lambda = 0.5$](#confusion-matrices--λ--05)
+  - [ROC Curves and AUC — $\lambda = 0.5$](#roc-curves-and-auc--λ--05)
   - [Lambda Trade-off Curve](#lambda-trade-off-curve)
   - [Per-Class F1 Across Lambda](#per-class-f1-across-lambda)
   - [Domain Accuracy Breakdown Across Lambda](#domain-accuracy-breakdown-across-lambda)
@@ -112,6 +112,8 @@ We split this balanced dataset using a fixed random seed into:
 ### Depth Maps
 To save GPU memory and training time, we pre-computed all depth maps once before training using **Depth Anything V2 (Small)**. These are saved to disk in a separate directory (`RRDataset_depth/`) as `.pt` files. During training, the dataloader loads the RGB image and its corresponding pre-computed `.pt` depth tensor.
 
+![Paired RGB and Depth Maps](assets/depth_maps.png)
+
 > **The dataset is not included in this repository.** See [How to Run](#how-to-run) for download instructions.
 
 ---
@@ -140,6 +142,8 @@ The frequency branch converts the RGB image into the frequency domain:
 3. **Concat:** Concatenate the magnitude and phase spectrum along the channel dimension, producing a 6-channel input tensor (shape `[B, 6, 224, 224]`).
 
 This tensor is processed by `FourierNet` (three convolutional blocks with ReLU activations, global average pooling, and a fully connected layer), outputting a **64-dimensional frequency embedding**.
+
+![Fourier Analysis](assets/fourier.png)
 
 ---
 
@@ -348,7 +352,7 @@ This table is the reference containing all key quantitative metrics computed on 
 **What it shows:** A direct comparison between the five multi-task models and two unimodal baselines: `UnimodalNetAI` ($\lambda = 1.0$, trained on AI detection only) and `UnimodalNetDomain` ($\lambda = 0.0$, trained on transformation classification only). All models share the same backbone and training setup. This comparison proves whether joint training helps or hurts performance.
  
 **Observation:** 
-*   **Unimodal Specialists at Chance Level:**
+*   **Unimodal Baseline Performance:**
     *   The AI-only model ($\lambda = 1.0$) reaches 81.2% accuracy.
     *   The Domain-only model ($\lambda = 0.0$) reaches 59.6% accuracy.
 *   **The Multi-Task Advantage ($\lambda = 0.5$):**
@@ -413,7 +417,7 @@ pip install torch torchvision transformers pillow numpy matplotlib seaborn sciki
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/ilaria-casolino/<repo-name>.git
+git clone https://github.com/mattew-giambo/ComputerVision-Project.git
 cd <repo-name>
 ```
 
