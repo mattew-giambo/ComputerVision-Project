@@ -1,3 +1,4 @@
 .vscode
+.DS_Store
 RRDataset_test/
 RRDataset_depth/
