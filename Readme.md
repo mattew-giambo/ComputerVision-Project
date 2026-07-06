@@ -182,7 +182,7 @@ Where:
 * $\mathcal{L}_{\text{domain}}$ is the Cross-Entropy loss for Task 2.
 * $\lambda \in [0, 1]$ is the scalar weighting parameter that controls the trade-off between the two tasks.
 
-Five **fully independent** models are trained from scratch, one for each value of $\lambda = \left\{0.1, 0.3, 0.5, 0.7, 0.9\right\}$. Each model uses a fixed $\lambda$ for its entire training schedule. 
+Five **fully independent** models are trained from scratch, one for each value of $\lambda = \{0.1, 0.3, 0.5, 0.7, 0.9\}$. Each model uses a fixed $\lambda$ for its entire training schedule. 
 
 ### Unimodal Baselines
 
